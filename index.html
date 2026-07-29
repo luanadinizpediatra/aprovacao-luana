@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aprovação de Conteúdo · Dra. Luana</title>
+
+<!-- Fontes -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- Firebase (compat, sem build) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<style>
+  :root{
+    --paper: #F6F4EF;
+    --paper-2: #EFEBE2;
+    --ink: #24302B;
+    --ink-soft: #5B675F;
+    --teal: #3D6B63;
+    --teal-deep: #2A4B45;
+    --clay: #C1573B;
+    --amber: #C98A32;
+    --line: #DCD6C8;
+    --white: #FFFFFF;
+    --radius: 14px;
+    --shadow: 0 2px 10px rgba(36,48,43,0.06);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  h1,h2,h3,.display{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    letter-spacing:-0.01em;
+    color:var(--ink);
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+
+  /* Layout */
+  .wrap{max-width:760px;margin:0 auto;padding:24px 18px 80px;}
+  header.top{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:6px 0 22px;
+  }
+  header.top .brand{display:flex;align-items:center;gap:10px;}
+  header.top .brand .dot{
+    width:10px;height:10px;border-radius:50%;background:var(--teal);
+    box-shadow:0 0 0 3px rgba(61,107,99,0.15);
+  }
+  header.top h1{font-size:1.3rem;margin:0;}
+  header.top .sub{font-size:0.78rem;color:var(--ink-soft);margin-top:2px;}
+  .badge-mode{
+    font-family:'IBM Plex Mono',monospace;font-size:0.68rem;
+    color:var(--ink-soft); border:1px solid var(--line); border-radius:20px;
+    padding:4px 10px; background:var(--white);
+  }
+
+  .tabs{display:flex;gap:8px;margin-bottom:18px;}
+  .tab{
+    font-family:'Inter',sans-serif;font-weight:600;font-size:0.85rem;
+    padding:8px 16px;border-radius:30px;border:1px solid var(--line);
+    background:var(--white);color:var(--ink-soft);cursor:pointer;
+    transition:all .15s ease;
+  }
+  .tab.active{background:var(--teal);color:var(--white);border-color:var(--teal);}
+
+  /* Cards */
+  .card{
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:18px 18px;
+    margin-bottom:14px;
+    cursor:pointer;
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(36,48,43,0.10);}
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+  .card-title{font-family:'Fraunces',serif;font-size:1.08rem;font-weight:600;margin:0 0 6px;}
+  .card-meta{font-size:0.78rem;color:var(--ink-soft);display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .type-tag{
+    font-family:'IBM Plex Mono',monospace;font-size:0.66rem;text-transform:uppercase;
+    letter-spacing:.04em;padding:2px 8px;border-radius:6px;background:var(--paper-2);color:var(--ink-soft);
+  }
+  .status-pill{
+    font-size:0.72rem;font-weight:600;padding:4px 10px;border-radius:20px;
+    display:inline-flex;align-items:center;gap:5px;
+  }
+  .status-pendente{background:#FBF0DE;color:var(--amber);}
+  .status-aprovado{background:#E4EEEC;color:var(--teal-deep);}
+  .status-ajustes{background:#F7E4DE;color:var(--clay);}
+  .card-preview{font-size:0.86rem;color:var(--ink-soft);margin-top:8px;line-height:1.5;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+
+  /* Deadline ring — elemento assinatura */
+  .deadline{position:relative;width:44px;height:44px;flex-shrink:0;}
+  .deadline svg{transform:rotate(-90deg);}
+  .deadline .track{fill:none;stroke:var(--paper-2);stroke-width:4;}
+  .deadline .fill{fill:none;stroke-width:4;stroke-linecap:round;transition:stroke-dashoffset .3s;}
+  .deadline .num{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-family:'IBM Plex Mono',monospace;font-size:0.62rem;font-weight:600;color:var(--ink);
+  }
+
+  /* Empty state */
+  .empty{
+    text-align:center;padding:50px 20px;color:var(--ink-soft);
+  }
+  .empty h3{margin-bottom:6px;}
+  .empty p{font-size:0.9rem;margin:0;}
+
+  /* Forms */
+  label{display:block;font-size:0.78rem;font-weight:600;color:var(--ink-soft);margin:14px 0 6px;}
+  label:first-of-type{margin-top:0;}
+  input[type=text], input[type=date], input[type=url], textarea, select{
+    width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:10px;
+    font-family:'Inter',sans-serif;font-size:0.92rem;background:var(--white);color:var(--ink);
+  }
+  textarea{min-height:110px;resize:vertical;line-height:1.5;}
+  input:focus, textarea:focus, select:focus{outline:2px solid var(--teal);outline-offset:1px;}
+  .img-row{display:flex;gap:8px;margin-bottom:8px;}
+  .img-row input{flex:1;}
+  .btn{
+    font-family:'Inter',sans-serif;font-weight:600;font-size:0.88rem;
+    padding:11px 18px;border-radius:10px;border:none;cursor:pointer;
+    transition:opacity .12s ease;
+  }
+  .btn:hover{opacity:0.88;}
+  .btn-primary{background:var(--teal);color:var(--white);}
+  .btn-outline{background:transparent;border:1px solid var(--line);color:var(--ink);}
+  .btn-clay{background:var(--clay);color:var(--white);}
+  .btn-ghost{background:transparent;color:var(--ink-soft);border:none;text-decoration:underline;font-weight:500;}
+  .btn-small{padding:6px 12px;font-size:0.78rem;}
+  .btn-block{width:100%;}
+  .btn-row{display:flex;gap:10px;margin-top:16px;}
+
+  /* Modal */
+  .overlay{
+    position:fixed;inset:0;background:rgba(36,48,43,0.45);
+    display:flex;align-items:flex-end;justify-content:center;z-index:100;
+    animation:fade .15s ease;
+  }
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  @media(min-width:640px){.overlay{align-items:center;}}
+  .modal{
+    background:var(--paper);width:100%;max-width:560px;max-height:88vh;overflow-y:auto;
+    border-radius:20px 20px 0 0;padding:26px 22px 30px;
+    box-shadow:0 -6px 30px rgba(0,0,0,0.15);
+  }
+  @media(min-width:640px){.modal{border-radius:20px;}}
+  .modal-close{float:right;background:none;border:none;font-size:1.3rem;color:var(--ink-soft);cursor:pointer;line-height:1;}
+  .modal img{width:100%;border-radius:10px;margin-bottom:10px;display:block;}
+  .modal .body-text{white-space:pre-wrap;line-height:1.6;font-size:0.94rem;margin:14px 0;}
+  .modal .prazo-line{font-size:0.82rem;color:var(--ink-soft);margin-bottom:4px;}
+  .divider{height:1px;background:var(--line);margin:18px 0;}
+  .comment-box{background:var(--paper-2);border-radius:10px;padding:12px 14px;font-size:0.88rem;margin-top:10px;}
+  .comment-box .who{font-weight:600;font-size:0.76rem;color:var(--ink-soft);margin-bottom:4px;}
+
+  /* Login gate */
+  .gate{max-width:340px;margin:80px auto;text-align:center;}
+  .gate input{text-align:center;letter-spacing:.1em;}
+
+  /* Reminder banner */
+  .reminder-bar{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    background:#FBF0DE;border:1px solid #EBD9AE;border-radius:10px;
+    padding:10px 14px;margin-bottom:10px;font-size:0.82rem;color:#7A5A1E;
+  }
+  .reminder-bar a{color:var(--teal-deep);font-weight:600;text-decoration:none;white-space:nowrap;}
+
+  .footer-note{text-align:center;font-size:0.74rem;color:var(--ink-soft);margin-top:40px;}
+  .toast{
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:var(--ink);color:var(--white);padding:10px 18px;border-radius:30px;
+    font-size:0.84rem;box-shadow:0 4px 16px rgba(0,0,0,0.2);z-index:200;
+  }
+</style>
+</head>
+<body>
+
+<div id="app" class="wrap"></div>
+
+<script>
+/* ======================================================
+   CONFIGURAÇÃO — preencha antes de publicar
+   ====================================================== */
+const firebaseConfig = {
+  apiKey: "COLE_AQUI",
+  authDomain: "COLE_AQUI.firebaseapp.com",
+  projectId: "COLE_AQUI",
+  storageBucket: "COLE_AQUI.appspot.com",
+  messagingSenderId: "COLE_AQUI",
+  appId: "COLE_AQUI"
+};
+
+// Número de WhatsApp da Dra. Luana, formato internacional sem espaços/símbolos
+// Ex: 55 (Brasil) + DDD + número => "5537999999999"
+const NUMERO_WHATSAPP_LUANA = "5500000000000";
+
+// Senha simples para o painel do admin (troque à vontade)
+const SENHA_ADMIN = "sirius2026";
+
+/* ====================================================== */
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const col = db.collection("conteudos");
+
+const params = new URLSearchParams(location.search);
+const isAdmin = params.get("painel") === "lucas";
+const idParaAbrir = params.get("id");
+
+let itens = [];
+let filtroAtual = "pendentes";
+let unsub = null;
+
+const app = document.getElementById("app");
+
+function fmtData(iso){
+  if(!iso) return "-";
+  const [y,m,d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function diasRestantes(iso){
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const prazo = new Date(iso+"T00:00:00");
+  return Math.round((prazo - hoje) / 86400000);
+}
+
+function urgenciaCor(dias){
+  if(dias < 0) return "#C1573B";
+  if(dias <= 2) return "#C1573B";
+  if(dias <= 5) return "#C98A32";
+  return "#3D6B63";
+}
+
+function anelPrazo(iso){
+  const dias = diasRestantes(iso);
+  const cor = urgenciaCor(dias);
+  const total = 14; // janela de referência do anel: 14 dias
+  const pct = Math.max(0, Math.min(1, (total + dias) / (total * 2)));
+  const r = 18, c = 2*Math.PI*r;
+  const offset = c * (1 - pct);
+  const label = dias < 0 ? "atr." : dias === 0 ? "hoje" : dias+"d";
+  return `<div class="deadline">
+    <svg width="44" height="44" viewBox="0 0 44 44">
+      <circle class="track" cx="22" cy="22" r="${r}"></circle>
+      <circle class="fill" cx="22" cy="22" r="${r}" stroke="${cor}"
+        stroke-dasharray="${c}" stroke-dashoffset="${offset}"></circle>
+    </svg>
+    <div class="num">${label}</div>
+  </div>`;
+}
+
+function statusLabel(s){
+  return s==="aprovado" ? "Aprovado" : s==="ajustes" ? "Ajustes pedidos" : "Pendente";
+}
+function statusClass(s){
+  return s==="aprovado" ? "status-aprovado" : s==="ajustes" ? "status-ajustes" : "status-pendente";
+}
+
+function toast(msg){
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 2600);
+}
+
+function linkClienteDoItem(id){
+  const base = location.origin + location.pathname;
+  return `${base}?id=${id}`;
+}
+
+function linkWhatsappLembrete(item){
+  const texto = `Oi Dra. Luana! 👋 Lembrete rápido: o conteúdo "${item.titulo}" está aguardando sua revisão e o prazo é ${fmtData(item.prazo)}. Você pode olhar por aqui: ${linkClienteDoItem(item.id)}`;
+  return `https://wa.me/${NUMERO_WHATSAPP_LUANA}?text=${encodeURIComponent(texto)}`;
+}
+
+/* ---------------- Firestore ---------------- */
+function iniciarEscuta(){
+  if(unsub) unsub();
+  unsub = col.orderBy("prazo","asc").onSnapshot(snap=>{
+    itens = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    render();
+    if(idParaAbrir){
+      const alvo = itens.find(i=>i.id===idParaAbrir);
+      if(alvo){ abrirModal(alvo); }
+    }
+  }, err=>{
+    app.innerHTML = `<div class="empty"><h3>Não foi possível conectar</h3><p>Confira se o firebaseConfig foi preenchido corretamente e se o Firestore está ativado. Detalhe: ${err.message}</p></div>`;
+  });
+}
+
+async function salvarConteudo(dados){
+  await col.add({...dados, status:"pendente", comentario:"", criadoEm: Date.now(), atualizadoEm: Date.now()});
+}
+
+async function atualizarStatus(id, status, comentario){
+  await col.doc(id).update({status, comentario: comentario||"", atualizadoEm: Date.now()});
+}
+
+async function excluirConteudo(id){
+  await col.doc(id).delete();
+}
+
+/* ---------------- Render: Cliente ---------------- */
+function renderCliente(){
+  const pendentes = itens.filter(i=>i.status==="pendente");
+  const resolvidos = itens.filter(i=>i.status!=="pendente");
+  const lista = filtroAtual==="pendentes" ? pendentes : itens;
+
+  app.innerHTML = `
+    <header class="top">
+      <div class="brand">
+        <div class="dot"></div>
+        <div>
+          <h1>Revisão de conteúdo</h1>
+          <div class="sub">Dra. Luana · Sirius</div>
+        </div>
+      </div>
+    </header>
+
+    <div class="tabs">
+      <div class="tab ${filtroAtual==='pendentes'?'active':''}" data-f="pendentes">Pendentes (${pendentes.length})</div>
+      <div class="tab ${filtroAtual==='todos'?'active':''}" data-f="todos">Todos (${itens.length})</div>
+    </div>
+
+    <div id="lista"></div>
+    <div class="footer-note">Sistema de aprovação de conteúdo · Sirius</div>
+  `;
+
+  document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{filtroAtual=t.dataset.f; renderCliente();});
+
+  const listaEl = document.getElementById("lista");
+  if(lista.length===0){
+    listaEl.innerHTML = `<div class="empty"><h3>Tudo em dia ✅</h3><p>Não há conteúdos pendentes de revisão no momento.</p></div>`;
+    return;
+  }
+  listaEl.innerHTML = lista.map(cardHTML).join("");
+  listaEl.querySelectorAll(".card").forEach(c=>{
+    c.onclick = ()=>{
+      const item = itens.find(i=>i.id===c.dataset.id);
+      abrirModal(item);
+    };
+  });
+}
+
+function cardHTML(item){
+  const dias = diasRestantes(item.prazo);
+  return `
+    <div class="card" data-id="${item.id}">
+      <div class="card-top">
+        <div style="flex:1">
+          <div class="card-title">${escapeHtml(item.titulo)}</div>
+          <div class="card-meta">
+            <span class="type-tag">${item.tipo}</span>
+            <span class="status-pill ${statusClass(item.status)}">${statusLabel(item.status)}</span>
+          </div>
+          <div class="card-preview">${escapeHtml(item.corpo||"")}</div>
+        </div>
+        ${item.status==="pendente" ? anelPrazo(item.prazo) : ""}
+      </div>
+    </div>
+  `;
+}
+
+function escapeHtml(s){
+  return (s||"").replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+/* ---------------- Modal (cliente) ---------------- */
+function abrirModal(item){
+  const overlay = document.createElement("div");
+  overlay.className = "overlay";
+  overlay.innerHTML = `
+    <div class="modal">
+      <button class="modal-close" id="fechar">×</button>
+      <span class="type-tag">${item.tipo}</span>
+      <h2 style="margin:10px 0 4px;">${escapeHtml(item.titulo)}</h2>
+      <div class="prazo-line">Prazo de revisão: <strong>${fmtData(item.prazo)}</strong> · <span class="status-pill ${statusClass(item.status)}">${statusLabel(item.status)}</span></div>
+      ${(item.imagens||[]).filter(Boolean).map(u=>`<img src="${u}" alt="">`).join("")}
+      <div class="body-text">${escapeHtml(item.corpo||"")}</div>
+      ${item.comentario ? `<div class="comment-box"><div class="who">Comentário anterior</div>${escapeHtml(item.comentario)}</div>` : ""}
+      ${item.status==="pendente" ? `
+        <div class="divider"></div>
+        <label>Comentário (opcional em aprovação, recomendado em ajuste)</label>
+        <textarea id="comentarioInput" placeholder="Ex: trocar o termo X por Y, está tecnicamente correto porém..."></textarea>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="aprovar" style="flex:1">Aprovar</button>
+          <button class="btn btn-clay" id="ajustar" style="flex:1">Pedir ajuste</button>
+        </div>
+      ` : ""}
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.onclick = (e)=>{ if(e.target===overlay) overlay.remove(); };
+  overlay.querySelector("#fechar").onclick = ()=>overlay.remove();
+
+  if(item.status==="pendente"){
+    overlay.querySelector("#aprovar").onclick = async ()=>{
+      const c = overlay.querySelector("#comentarioInput").value.trim();
+      await atualizarStatus(item.id, "aprovado", c);
+      toast("Conteúdo aprovado ✅");
+      overlay.remove();
+    };
+    overlay.querySelector("#ajustar").onclick = async ()=>{
+      const c = overlay.querySelector("#comentarioInput").value.trim();
+      if(!c){ toast("Escreva o que precisa ser ajustado"); return; }
+      await atualizarStatus(item.id, "ajustes", c);
+      toast("Ajuste solicitado");
+      overlay.remove();
+    };
+  }
+}
+
+/* ---------------- Render: Admin ---------------- */
+function renderAdmin(){
+  const logado = sessionStorage.getItem("adminOk") === "1";
+  if(!logado){
+    app.innerHTML = `
+      <div class="gate">
+        <h1 class="display">Painel Sirius</h1>
+        <p style="color:var(--ink-soft);font-size:0.88rem;margin-bottom:18px;">Acesso restrito</p>
+        <input type="text" id="senha" placeholder="Senha">
+        <button class="btn btn-primary btn-block" id="entrar" style="margin-top:12px;">Entrar</button>
+      </div>
+    `;
+    document.getElementById("entrar").onclick = ()=>{
+      if(document.getElementById("senha").value === SENHA_ADMIN){
+        sessionStorage.setItem("adminOk","1");
+        renderAdmin();
+      } else { toast("Senha incorreta"); }
+    };
+    return;
+  }
+
+  const pendentes = itens.filter(i=>i.status==="pendente");
+  const urgentes = pendentes.filter(i=>diasRestantes(i.prazo) <= 2);
+
+  app.innerHTML = `
+    <header class="top">
+      <div class="brand">
+        <div class="dot"></div>
+        <div>
+          <h1>Painel Sirius</h1>
+          <div class="sub">Conteúdos · Dra. Luana</div>
+        </div>
+      </div>
+      <div class="badge-mode">admin</div>
+    </header>
+
+    ${urgentes.map(i=>`
+      <div class="reminder-bar">
+        <span>⏰ "${escapeHtml(i.titulo)}" vence ${diasRestantes(i.prazo)<0?'(atrasado)':'em '+diasRestantes(i.prazo)+' dia(s)'}</span>
+        <a href="${linkWhatsappLembrete(i)}" target="_blank">Enviar lembrete →</a>
+      </div>
+    `).join("")}
+
+    <div class="tabs">
+      <div class="tab active" id="novoBtn">+ Novo conteúdo</div>
+    </div>
+
+    <div id="form-area"></div>
+
+    <div class="tabs" style="margin-top:6px;">
+      <div class="tab ${filtroAtual==='pendentes'?'active':''}" data-f="pendentes">Pendentes (${pendentes.length})</div>
+      <div class="tab ${filtroAtual==='todos'?'active':''}" data-f="todos">Todos (${itens.length})</div>
+    </div>
+
+    <div id="lista"></div>
+    <div class="footer-note">Link para a Dra. Luana: <span class="mono">${location.origin+location.pathname}</span></div>
+  `;
+
+  document.querySelectorAll(".tab[data-f]").forEach(t=>t.onclick=()=>{filtroAtual=t.dataset.f; renderAdmin();});
+  document.getElementById("novoBtn").onclick = toggleForm;
+
+  const lista = filtroAtual==="pendentes" ? pendentes : itens;
+  const listaEl = document.getElementById("lista");
+  if(lista.length===0){
+    listaEl.innerHTML = `<div class="empty"><h3>Nada por aqui</h3><p>Cadastre o primeiro conteúdo acima.</p></div>`;
+  } else {
+    listaEl.innerHTML = lista.map(item=>`
+      <div class="card" data-id="${item.id}">
+        <div class="card-top">
+          <div style="flex:1">
+            <div class="card-title">${escapeHtml(item.titulo)}</div>
+            <div class="card-meta">
+              <span class="type-tag">${item.tipo}</span>
+              <span class="status-pill ${statusClass(item.status)}">${statusLabel(item.status)}</span>
+              <span>Prazo ${fmtData(item.prazo)}</span>
+            </div>
+            ${item.comentario ? `<div class="comment-box"><div class="who">Comentário da Dra. Luana</div>${escapeHtml(item.comentario)}</div>` : ""}
+          </div>
+          ${item.status==="pendente" ? anelPrazo(item.prazo) : ""}
+        </div>
+        <div class="btn-row">
+          <a class="btn btn-outline btn-small" href="${linkClienteDoItem(item.id)}" target="_blank">Ver como Luana</a>
+          <a class="btn btn-outline btn-small" href="${linkWhatsappLembrete(item)}" target="_blank">Lembrete WhatsApp</a>
+          <button class="btn btn-ghost btn-small excluir" data-id="${item.id}">Excluir</button>
+        </div>
+      </div>
+    `).join("");
+    listaEl.querySelectorAll(".excluir").forEach(b=>{
+      b.onclick = async (e)=>{
+        e.stopPropagation();
+        if(confirm("Excluir este conteúdo?")){
+          await excluirConteudo(b.dataset.id);
+          toast("Excluído");
+        }
+      };
+    });
+  }
+}
+
+let formAberto = false;
+let imagensCampos = 1;
+
+function toggleForm(){
+  formAberto = !formAberto;
+  const area = document.getElementById("form-area");
+  if(!formAberto){ area.innerHTML=""; return; }
+  imagensCampos = 1;
+  area.innerHTML = formularioHTML();
+  ligarFormulario();
+}
+
+function formularioHTML(){
+  let imgs = "";
+  for(let i=0;i<imagensCampos;i++){
+    imgs += `<div class="img-row"><input type="url" class="img-url" placeholder="Link da imagem/arte ${i+1} (opcional)"></div>`;
+  }
+  return `
+    <div class="card">
+      <label>Título</label>
+      <input type="text" id="f-titulo" placeholder="Ex: Carrossel vacina VPC20">
+      <label>Tipo</label>
+      <select id="f-tipo">
+        <option value="texto">Texto / legenda</option>
+        <option value="imagem">Imagem única</option>
+        <option value="carrossel">Carrossel</option>
+      </select>
+      <label>Texto / roteiro</label>
+      <textarea id="f-corpo" placeholder="Cole aqui o texto, legenda ou roteiro completo"></textarea>
+      <label>Imagens (cole os links)</label>
+      <div id="imgs-wrap">${imgs}</div>
+      <button class="btn btn-ghost btn-small" id="add-img">+ adicionar outro link</button>
+      <label>Prazo para aprovação</label>
+      <input type="date" id="f-prazo">
+      <div class="btn-row">
+        <button class="btn btn-primary" id="salvar" style="flex:1">Salvar e enviar pra fila</button>
+        <button class="btn btn-outline" id="cancelar">Cancelar</button>
+      </div>
+    </div>
+  `;
+}
+
+function ligarFormulario(){
+  document.getElementById("add-img").onclick = ()=>{
+    imagensCampos++;
+    document.getElementById("imgs-wrap").insertAdjacentHTML("beforeend", `<div class="img-row"><input type="url" class="img-url" placeholder="Link da imagem/arte ${imagensCampos} (opcional)"></div>`);
+  };
+  document.getElementById("cancelar").onclick = toggleForm;
+  document.getElementById("salvar").onclick = async ()=>{
+    const titulo = document.getElementById("f-titulo").value.trim();
+    const tipo = document.getElementById("f-tipo").value;
+    const corpo = document.getElementById("f-corpo").value.trim();
+    const prazo = document.getElementById("f-prazo").value;
+    const imagens = Array.from(document.querySelectorAll(".img-url")).map(i=>i.value.trim()).filter(Boolean);
+
+    if(!titulo || !prazo){ toast("Preencha ao menos título e prazo"); return; }
+
+    await salvarConteudo({titulo, tipo, corpo, imagens, prazo});
+    toast("Conteúdo enviado pra fila de aprovação");
+    formAberto = false;
+    renderAdmin();
+  };
+}
+
+/* ---------------- Boot ---------------- */
+function render(){
+  if(isAdmin) renderAdmin(); else renderCliente();
+}
+
+iniciarEscuta();
+</script>
+</body>
+</html>
