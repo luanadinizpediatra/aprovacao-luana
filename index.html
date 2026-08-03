@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Aprovação de Conteúdo · Dra. Luana</title>
+<meta name="theme-color" content="#3D6B63">
+<link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/icon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png">
+<link rel="manifest" href="manifest.json">
 
 <!-- Fontes -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -55,6 +61,10 @@
   header.top .brand .dot{
     width:10px;height:10px;border-radius:50%;background:var(--teal);
     box-shadow:0 0 0 3px rgba(61,107,99,0.15);
+  }
+  header.top .brand .logo-img{
+    width:40px;height:40px;border-radius:50%;object-fit:cover;
+    box-shadow:0 0 0 2px var(--paper), 0 0 0 3px var(--line);
   }
   header.top h1{font-size:1.3rem;margin:0;}
   header.top .sub{font-size:0.78rem;color:var(--ink-soft);margin-top:2px;}
@@ -324,7 +334,7 @@ function renderCliente(){
   app.innerHTML = `
     <header class="top">
       <div class="brand">
-        <div class="dot"></div>
+        <img class="logo-img" src="assets/icon-192.png" alt="Dra. Luana">
         <div>
           <h1>Revisão de conteúdo</h1>
           <div class="sub">Dra. Luana · Sirius</div>
@@ -452,7 +462,7 @@ function renderAdmin(){
   app.innerHTML = `
     <header class="top">
       <div class="brand">
-        <div class="dot"></div>
+        <img class="logo-img" src="assets/icon-192.png" alt="Dra. Luana">
         <div>
           <h1>Painel Sirius</h1>
           <div class="sub">Conteúdos · Dra. Luana</div>
