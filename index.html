@@ -109,6 +109,7 @@
   .status-pendente{background:#FBF0DE;color:var(--amber);}
   .status-aprovado{background:#E4EEEC;color:var(--teal-deep);}
   .status-ajustes{background:#F7E4DE;color:var(--clay);}
+  .status-concluido{background:#EFEBE2;color:var(--ink-soft);}
   .card-preview{font-size:0.86rem;color:var(--ink-soft);margin-top:8px;line-height:1.5;
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 
@@ -274,10 +275,10 @@ function anelPrazo(iso){
 }
 
 function statusLabel(s){
-  return s==="aprovado" ? "Aprovado" : s==="ajustes" ? "Ajustes pedidos" : "Pendente";
+  return s==="aprovado" ? "Aprovado" : s==="ajustes" ? "Ajustes pedidos" : s==="concluido" ? "Concluído" : "Pendente";
 }
 function statusClass(s){
-  return s==="aprovado" ? "status-aprovado" : s==="ajustes" ? "status-ajustes" : "status-pendente";
+  return s==="aprovado" ? "status-aprovado" : s==="ajustes" ? "status-ajustes" : s==="concluido" ? "status-concluido" : "status-pendente";
 }
 
 function toast(msg){
@@ -321,6 +322,14 @@ async function atualizarStatus(id, status, comentario){
   await col.doc(id).update({status, comentario: comentario||"", atualizadoEm: Date.now()});
 }
 
+async function atualizarConteudo(id, dados){
+  await col.doc(id).update({...dados, atualizadoEm: Date.now()});
+}
+
+async function marcarConcluido(id){
+  await col.doc(id).update({status:"concluido", atualizadoEm: Date.now()});
+}
+
 async function excluirConteudo(id){
   await col.doc(id).delete();
 }
@@ -340,6 +349,7 @@ function renderCliente(){
           <div class="sub">Dra. Luana · Sirius</div>
         </div>
       </div>
+      <a href="?painel=lucas" class="badge-mode" style="text-decoration:none;">⚙ admin</a>
     </header>
 
     <div class="tabs">
@@ -457,6 +467,8 @@ function renderAdmin(){
   }
 
   const pendentes = itens.filter(i=>i.status==="pendente");
+  const revisados = itens.filter(i=>i.status==="aprovado" || i.status==="ajustes");
+  const concluidos = itens.filter(i=>i.status==="concluido");
   const urgentes = pendentes.filter(i=>diasRestantes(i.prazo) <= 2);
 
   app.innerHTML = `
@@ -486,7 +498,8 @@ function renderAdmin(){
 
     <div class="tabs" style="margin-top:6px;">
       <div class="tab ${filtroAtual==='pendentes'?'active':''}" data-f="pendentes">Pendentes (${pendentes.length})</div>
-      <div class="tab ${filtroAtual==='todos'?'active':''}" data-f="todos">Todos (${itens.length})</div>
+      <div class="tab ${filtroAtual==='revisados'?'active':''}" data-f="revisados">Revisados (${revisados.length})</div>
+      <div class="tab ${filtroAtual==='concluidos'?'active':''}" data-f="concluidos">Concluídos (${concluidos.length})</div>
     </div>
 
     <div id="lista"></div>
@@ -494,12 +507,15 @@ function renderAdmin(){
   `;
 
   document.querySelectorAll(".tab[data-f]").forEach(t=>t.onclick=()=>{filtroAtual=t.dataset.f; renderAdmin();});
-  document.getElementById("novoBtn").onclick = toggleForm;
+  document.getElementById("novoBtn").onclick = ()=>{ editandoId=null; toggleForm(); };
 
-  const lista = filtroAtual==="pendentes" ? pendentes : itens;
+  const lista = filtroAtual==="pendentes" ? pendentes : filtroAtual==="revisados" ? revisados : concluidos;
   const listaEl = document.getElementById("lista");
   if(lista.length===0){
-    listaEl.innerHTML = `<div class="empty"><h3>Nada por aqui</h3><p>Cadastre o primeiro conteúdo acima.</p></div>`;
+    const msg = filtroAtual==="pendentes" ? "Cadastre o primeiro conteúdo acima."
+      : filtroAtual==="revisados" ? "Assim que a Dra. Luana aprovar ou pedir ajuste em algo, aparece aqui."
+      : "Conteúdos marcados como concluídos aparecem aqui.";
+    listaEl.innerHTML = `<div class="empty"><h3>Nada por aqui</h3><p>${msg}</p></div>`;
   } else {
     listaEl.innerHTML = lista.map(item=>`
       <div class="card" data-id="${item.id}">
@@ -516,8 +532,14 @@ function renderAdmin(){
           ${item.status==="pendente" ? anelPrazo(item.prazo) : ""}
         </div>
         <div class="btn-row">
-          <a class="btn btn-outline btn-small" href="${linkClienteDoItem(item.id)}" target="_blank">Ver como Luana</a>
-          <a class="btn btn-outline btn-small" href="${linkWhatsappLembrete(item)}" target="_blank">Lembrete WhatsApp</a>
+          ${item.status==="pendente" ? `
+            <a class="btn btn-outline btn-small" href="${linkClienteDoItem(item.id)}" target="_blank">Ver como Luana</a>
+            <a class="btn btn-outline btn-small" href="${linkWhatsappLembrete(item)}" target="_blank">Lembrete WhatsApp</a>
+          ` : ""}
+          ${item.status==="aprovado" || item.status==="ajustes" ? `
+            <button class="btn btn-outline btn-small editar" data-id="${item.id}">Editar</button>
+            <button class="btn btn-primary btn-small concluir" data-id="${item.id}">Concluído</button>
+          ` : ""}
           <button class="btn btn-ghost btn-small excluir" data-id="${item.id}">Excluir</button>
         </div>
       </div>
@@ -531,14 +553,36 @@ function renderAdmin(){
         }
       };
     });
+    listaEl.querySelectorAll(".concluir").forEach(b=>{
+      b.onclick = async (e)=>{
+        e.stopPropagation();
+        await marcarConcluido(b.dataset.id);
+        toast("Marcado como concluído ✅");
+      };
+    });
+    listaEl.querySelectorAll(".editar").forEach(b=>{
+      b.onclick = (e)=>{
+        e.stopPropagation();
+        const item = itens.find(i=>i.id===b.dataset.id);
+        editandoId = item.id;
+        formAberto = true;
+        const area = document.getElementById("form-area");
+        imagensCampos = (item.imagens && item.imagens.length) ? item.imagens.length : 1;
+        area.innerHTML = formularioHTML(item);
+        ligarFormulario(item);
+        area.scrollIntoView({behavior:"smooth", block:"start"});
+      };
+    });
   }
 }
 
 let formAberto = false;
 let imagensCampos = 1;
+let editandoId = null;
 
 function toggleForm(){
   formAberto = !formAberto;
+  editandoId = null;
   const area = document.getElementById("form-area");
   if(!formAberto){ area.innerHTML=""; return; }
   imagensCampos = 1;
@@ -546,42 +590,46 @@ function toggleForm(){
   ligarFormulario();
 }
 
-function formularioHTML(){
+function formularioHTML(item){
+  const dados = item || {titulo:"", tipo:"texto", corpo:"", imagens:[], prazo:""};
   let imgs = "";
-  for(let i=0;i<imagensCampos;i++){
-    imgs += `<div class="img-row"><input type="url" class="img-url" placeholder="Link da imagem/arte ${i+1} (opcional)"></div>`;
+  const totalImgs = Math.max(imagensCampos, 1);
+  for(let i=0;i<totalImgs;i++){
+    const valor = (dados.imagens && dados.imagens[i]) ? dados.imagens[i] : "";
+    imgs += `<div class="img-row"><input type="url" class="img-url" value="${escapeHtml(valor)}" placeholder="Link da imagem/arte ${i+1} (opcional)"></div>`;
   }
   return `
     <div class="card">
+      ${item ? `<div class="type-tag" style="margin-bottom:10px;">editando conteúdo</div>` : ""}
       <label>Título</label>
-      <input type="text" id="f-titulo" placeholder="Ex: Carrossel vacina VPC20">
+      <input type="text" id="f-titulo" value="${escapeHtml(dados.titulo)}" placeholder="Ex: Carrossel vacina VPC20">
       <label>Tipo</label>
       <select id="f-tipo">
-        <option value="texto">Texto / legenda</option>
-        <option value="imagem">Imagem única</option>
-        <option value="carrossel">Carrossel</option>
+        <option value="texto" ${dados.tipo==="texto"?"selected":""}>Texto / legenda</option>
+        <option value="imagem" ${dados.tipo==="imagem"?"selected":""}>Imagem única</option>
+        <option value="carrossel" ${dados.tipo==="carrossel"?"selected":""}>Carrossel</option>
       </select>
       <label>Texto / roteiro</label>
-      <textarea id="f-corpo" placeholder="Cole aqui o texto, legenda ou roteiro completo"></textarea>
+      <textarea id="f-corpo" placeholder="Cole aqui o texto, legenda ou roteiro completo">${escapeHtml(dados.corpo)}</textarea>
       <label>Imagens (cole os links)</label>
       <div id="imgs-wrap">${imgs}</div>
       <button class="btn btn-ghost btn-small" id="add-img">+ adicionar outro link</button>
       <label>Prazo para aprovação</label>
-      <input type="date" id="f-prazo">
+      <input type="date" id="f-prazo" value="${dados.prazo||""}">
       <div class="btn-row">
-        <button class="btn btn-primary" id="salvar" style="flex:1">Salvar e enviar pra fila</button>
+        <button class="btn btn-primary" id="salvar" style="flex:1">${item ? "Salvar alterações" : "Salvar e enviar pra fila"}</button>
         <button class="btn btn-outline" id="cancelar">Cancelar</button>
       </div>
     </div>
   `;
 }
 
-function ligarFormulario(){
+function ligarFormulario(item){
   document.getElementById("add-img").onclick = ()=>{
     imagensCampos++;
     document.getElementById("imgs-wrap").insertAdjacentHTML("beforeend", `<div class="img-row"><input type="url" class="img-url" placeholder="Link da imagem/arte ${imagensCampos} (opcional)"></div>`);
   };
-  document.getElementById("cancelar").onclick = toggleForm;
+  document.getElementById("cancelar").onclick = ()=>{ formAberto=false; editandoId=null; renderAdmin(); };
   document.getElementById("salvar").onclick = async ()=>{
     const titulo = document.getElementById("f-titulo").value.trim();
     const tipo = document.getElementById("f-tipo").value;
@@ -591,9 +639,15 @@ function ligarFormulario(){
 
     if(!titulo || !prazo){ toast("Preencha ao menos título e prazo"); return; }
 
-    await salvarConteudo({titulo, tipo, corpo, imagens, prazo});
-    toast("Conteúdo enviado pra fila de aprovação");
+    if(item){
+      await atualizarConteudo(item.id, {titulo, tipo, corpo, imagens, prazo});
+      toast("Conteúdo atualizado");
+    } else {
+      await salvarConteudo({titulo, tipo, corpo, imagens, prazo});
+      toast("Conteúdo enviado pra fila de aprovação");
+    }
     formAberto = false;
+    editandoId = null;
     renderAdmin();
   };
 }
